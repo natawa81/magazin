@@ -2,23 +2,27 @@
 
 namespace app\controllers;
 
+use app\models\Page;
 use \vendor\core\Db;
+use \vendor\modules\SiteMapGenerator;
 
 /**
  * Description of App
  *
  */
-class AppController extends \vendor\core\Controller{
+class AppController extends \vendor\core\Controller
+{
     public $category = null;
 //    public $user = null;
     public $cart = [];
 
-    public function __construct($route) {
+    public function __construct($route)
+    {
         parent::__construct($route);
         $this->CompleteCategory();
 
         $this->user = new \vendor\core\User;
-        $this->filters_link = isset($route['category']) ? '/category-'.$route['category'] : '/';
+        $this->filters_link = isset($route['category']) ? '/category-' . $route['category'] : '/';
 
 
         $this->loadFilters();
@@ -28,9 +32,37 @@ class AppController extends \vendor\core\Controller{
         foreach ($this->cart as $i) {
             $this->in_cart += $i;
         }
+        $sitemap = ROOT . '/public/sitemap.xml';
+        $change = true;
+        if (file_exists($sitemap)) {
+            $ftime = filemtime($sitemap);
+            if ($ftime > time() - 3600) {
+                $change = false;
+            }
+        }
+        if ($change) {
+            $map = new SiteMapGenerator;
+            $cfg = GetConfig();
+            $map->set_last_mod_static(date('Y-m-d'));
+            $map->set_base_url(rtrim($cfg['url']) . '/');
+            $dir = diff_scandir(APP . '/controllers', '', ['php']);
+            $dir = array_diff($dir, ['AppController.php', 'admin', 'PageController.php']);
+            foreach ($dir as $val) {
+                $classname = pathinfo($val, PATHINFO_FILENAME);
+                $name = str_replace('controller', '', mb_strtolower($classname));
+                $map->addSite($name, ['changefreq' => 'never']);
+            }
+            $model = new Page();
+            $pages = $model->findAll("DESC", "`url`");
+            foreach ($pages as $page) {
+                $map->addSite('page/'.$page['url']);
+            }
+            file_put_contents($sitemap, $map->generate());
+        }
     }
 
-    public function loadFilters () {
+    public function loadFilters()
+    {
         $db = Db::instance();
         $data = $db->queryRow("SELECT MIN(`year`) as `min_year`, MAX(`year`) as `max_year`, MIN(`pages`) as `min_pages`, MAX(`pages`) as `max_pages` FROM `items`");
         $this->data_filters = $data;
@@ -53,7 +85,8 @@ class AppController extends \vendor\core\Controller{
 
     }
 
-    public function saveCart () {
+    public function saveCart()
+    {
         if ($this->user->login()) {
             $this->DB()->query("INSERT INTO `cart` (`user_id`, `data`) VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE `data` = VALUES (`data`)", [$this->user->id(), serialize($this->cart)]);
@@ -63,7 +96,8 @@ class AppController extends \vendor\core\Controller{
         }
     }
 
-    public function  loadCart () {
+    public function loadCart()
+    {
         $db = Db::instance();
         if ($this->user->login()) {
             $data = $db->queryRow("SELECT * FROM `cart` WHERE `user_id` = ?", [$this->user->id()]);
@@ -80,7 +114,8 @@ class AppController extends \vendor\core\Controller{
         }
     }
 
-    public function  CompleteCategory () {
+    public function CompleteCategory()
+    {
         global $app;
         $db = Db::instance();
         $cache = $app->cache->get('main_category_menu');
@@ -90,6 +125,5 @@ class AppController extends \vendor\core\Controller{
             $html = $this->category->Show();
             $this->main_category = $html;
         }
-//        return $list;
     }
 }

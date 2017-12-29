@@ -12,6 +12,20 @@ function getDescription ($text) {
     return $text;
 }
 
+function diff_scandir ($path, $prefix = '', $ext = []) {
+    $arr = array_diff(scandir($path), ['..','.']);
+    sort($arr);
+    if ($prefix != '' || count($ext) > 0) {
+        for ($i = 0; $i < count($arr); $i++) {
+            $e = mb_strtolower(pathinfo($arr[$i], PATHINFO_EXTENSION));
+            if (in_array($e, $ext)) {
+                $arr[$i] = $prefix . $arr[$i];
+            }
+        }
+    }
+    return $arr;
+}
+
 function getKeywords ($text) {
     preg_match_all('/([A-zА-я]{4,})/ui', $text, $matches);
     $words = $matches[0];
